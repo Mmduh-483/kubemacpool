@@ -83,6 +83,10 @@ func (r *ReconcilePolicy) Reconcile(request reconcile.Request) (reconcile.Result
 			if err != nil {
 				logging.Printf(logging.ErrorLevel, "failed to release mac for pod %s: %v", request.NamespacedName, err)
 			}
+			err = r.poolManager.ReleasePodGUID(fmt.Sprintf("%s/%s", request.Namespace, request.Name))
+			if err != nil {
+				logging.Printf(logging.ErrorLevel, "failed to release guid for pod %s: %v", request.NamespacedName, err)
+			}
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -97,6 +101,10 @@ func (r *ReconcilePolicy) Reconcile(request reconcile.Request) (reconcile.Result
 	err = r.poolManager.AllocatePodMac(instance)
 	if err != nil {
 		log.Error(err, "failed to allocate mac for pod")
+	}
+	err = r.poolManager.AllocatePodGUID(instance)
+	if err != nil {
+		log.Error(err, "failed to allocate guid for pod")
 	}
 
 	return reconcile.Result{}, nil

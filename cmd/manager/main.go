@@ -70,6 +70,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	guidRangeStart, err := loadMacAddressFromEnvVar("GUID_RANGE_START")
+	if err != nil {
+		log.Error(err, "Failed to load mac address from environment variable")
+		os.Exit(1)
+	}
+	guidRangeEnd, err := loadMacAddressFromEnvVar("GUID_RANGE_END")
+	if err != nil {
+		log.Error(err, "Failed to load mac address from environment variable")
+		os.Exit(1)
+	}
+
 	podNamespace, ok := os.LookupEnv("POD_NAMESPACE")
 	if !ok {
 		log.Error(err, "Failed to load pod namespace from environment variable")
@@ -84,7 +95,7 @@ func main() {
 
 	kubemacpoolManager := manager.NewKubeMacPoolManager(podNamespace, podName, metricsAddr, waitingTime)
 
-	err = kubemacpoolManager.Run(rangeStart, rangeEnd)
+	err = kubemacpoolManager.Run(rangeStart, rangeEnd, guidRangeStart, guidRangeEnd)
 	if err != nil {
 		log.Error(err, "Failed to run the manager")
 		os.Exit(1)

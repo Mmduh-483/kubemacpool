@@ -130,6 +130,8 @@ apiVersion: v1
 data:
   RANGE_END: 02:FF:FF:FF:FF:FF
   RANGE_START: "02:00:00:00:00:00"
+  GUID_RANGE_END: 02:FF:FF:FF:FF:FF:FF:FF
+  GUID_RANGE_START: "02:00:00:00:00:00:00:00"
 kind: ConfigMap
 metadata:
   labels:
@@ -147,7 +149,7 @@ metadata:
   name: kubemacpool-mac-controller-manager
   namespace: kubemacpool-system
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       control-plane: mac-controller-manager
@@ -158,6 +160,7 @@ spec:
         control-plane: mac-controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
+      hostNetwork: true
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -174,6 +177,7 @@ spec:
       - args:
         - --v=production
         - --wait-time=600
+        - --metrics-addr=:8072
         command:
         - /manager
         env:
@@ -195,8 +199,18 @@ spec:
             configMapKeyRef:
               key: RANGE_END
               name: kubemacpool-mac-range-config
+        - name: GUID_RANGE_START
+          valueFrom:
+            configMapKeyRef:
+              key: GUID_RANGE_START
+              name: kubemacpool-mac-range-config
+        - name: GUID_RANGE_END
+          valueFrom:
+            configMapKeyRef:
+              key: GUID_RANGE_END
+              name: kubemacpool-mac-range-config
         image: quay.io/kubevirt/kubemacpool:latest
-        imagePullPolicy: Always
+        imagePullPolicy: Never
         name: manager
         ports:
         - containerPort: 8000

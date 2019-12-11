@@ -39,13 +39,17 @@ var _ = Describe("Pool", func() {
 	samplePod := v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "podpod", Namespace: "default", Annotations: afterAllocationAnnotation}}
 	vmConfigMap := v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: names.MANAGER_NAMESPACE, Name: vmWaitConfigMapName}}
 
-	createPoolManager := func(startMacAddr, endMacAddr string, fakeObjectsForClient ...runtime.Object) *PoolManager {
+	createPoolManager := func(startMacAddr, endMacAddr, startGUIDAddr, endGUIDAddr string, fakeObjectsForClient ...runtime.Object) *PoolManager {
 		fakeClient := fake.NewSimpleClientset(fakeObjectsForClient...)
 		startPoolRangeEnv, err := net.ParseMAC(startMacAddr)
 		Expect(err).ToNot(HaveOccurred())
 		endPoolRangeEnv, err := net.ParseMAC(endMacAddr)
 		Expect(err).ToNot(HaveOccurred())
-		poolManager, err := NewPoolManager(fakeClient, startPoolRangeEnv, endPoolRangeEnv, names.MANAGER_NAMESPACE, false, 10)
+		guidStartPoolRangeEnv, err := net.ParseMAC(startGUIDAddr)
+		Expect(err).ToNot(HaveOccurred())
+		guidEndPoolRangeEnv, err := net.ParseMAC(endGUIDAddr)
+		Expect(err).ToNot(HaveOccurred())
+		poolManager, err := NewPoolManager(fakeClient, startPoolRangeEnv, endPoolRangeEnv, guidStartPoolRangeEnv, guidEndPoolRangeEnv, names.MANAGER_NAMESPACE, false, 10)
 		Expect(err).ToNot(HaveOccurred())
 
 		return poolManager
@@ -103,7 +107,7 @@ var _ = Describe("Pool", func() {
 
 	Describe("Pool Manager General Functions ", func() {
 		It("should create a pool manager", func() {
-			createPoolManager("02:00:00:00:00:00", "02:FF:FF:FF:FF:FF")
+			createPoolManager("02:00:00:00:00:00", "02:FF:FF:FF:FF:FF", "02:00:00:00:00:00:00:00", "02:FF:FF:FF:FF:FF:FF:FF")
 		})
 
 		It("should fail to create pool manager when rangeStart is greater than rangeEnd", func() {
@@ -112,7 +116,11 @@ var _ = Describe("Pool", func() {
 			Expect(err).ToNot(HaveOccurred())
 			endPoolRangeEnv, err := net.ParseMAC("02:00:00:00:00:00")
 			Expect(err).ToNot(HaveOccurred())
-			_, err = NewPoolManager(fakeClient, startPoolRangeEnv, endPoolRangeEnv, names.MANAGER_NAMESPACE, false, 10)
+			guidStartPoolRangeEnv, err := net.ParseMAC("02:00:00:00:00:00:00:00")
+			Expect(err).ToNot(HaveOccurred())
+			guidEndPoolRangeEnv, err := net.ParseMAC("02:FF:FF:FF:FF:FF:FF:FF")
+			Expect(err).ToNot(HaveOccurred())
+			_, err = NewPoolManager(fakeClient, startPoolRangeEnv, endPoolRangeEnv, guidStartPoolRangeEnv, guidEndPoolRangeEnv, names.MANAGER_NAMESPACE, false, 10)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("Invalid range. rangeStart: 0a:00:00:00:00:00 rangeEnd: 02:00:00:00:00:00"))
 
@@ -124,7 +132,11 @@ var _ = Describe("Pool", func() {
 			Expect(err).ToNot(HaveOccurred())
 			endPoolRangeEnv, err := net.ParseMAC("06:00:00:00:00:00")
 			Expect(err).ToNot(HaveOccurred())
-			_, err = NewPoolManager(fakeClient, startPoolRangeEnv, endPoolRangeEnv, names.MANAGER_NAMESPACE, false, 10)
+			guidStartPoolRangeEnv, err := net.ParseMAC("02:00:00:00:00:00:00:00")
+			Expect(err).ToNot(HaveOccurred())
+			guidEndPoolRangeEnv, err := net.ParseMAC("02:FF:FF:FF:FF:FF:FF:FF")
+			Expect(err).ToNot(HaveOccurred())
+			_, err = NewPoolManager(fakeClient, startPoolRangeEnv, endPoolRangeEnv, guidStartPoolRangeEnv, guidEndPoolRangeEnv, names.MANAGER_NAMESPACE, false, 10)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("RangeStart is invalid: invalid mac address. Multicast addressing is not supported. Unicast addressing must be used. The first octet is 0X3"))
 
@@ -136,7 +148,11 @@ var _ = Describe("Pool", func() {
 			Expect(err).ToNot(HaveOccurred())
 			endPoolRangeEnv, err := net.ParseMAC("05:00:00:00:00:00")
 			Expect(err).ToNot(HaveOccurred())
-			_, err = NewPoolManager(fakeClient, startPoolRangeEnv, endPoolRangeEnv, names.MANAGER_NAMESPACE, false, 10)
+			guidStartPoolRangeEnv, err := net.ParseMAC("02:00:00:00:00:00:00:00")
+			Expect(err).ToNot(HaveOccurred())
+			guidEndPoolRangeEnv, err := net.ParseMAC("02:FF:FF:FF:FF:FF:FF:FF")
+			Expect(err).ToNot(HaveOccurred())
+			_, err = NewPoolManager(fakeClient, startPoolRangeEnv, endPoolRangeEnv, guidStartPoolRangeEnv, guidEndPoolRangeEnv, names.MANAGER_NAMESPACE, false, 10)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("RangeEnd is invalid: invalid mac address. Multicast addressing is not supported. Unicast addressing must be used. The first octet is 0X5"))
 		})
@@ -193,7 +209,7 @@ var _ = Describe("Pool", func() {
 					Networks: []kubevirt.Network{podNetwork, multusNetwork}}}}}
 
 		It("should allocate a new mac and release it for masquerade", func() {
-			poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", &samplePod, &vmConfigMap)
+			poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:00:00:00", "02:00:00:00:00:00:00:02", &samplePod, &vmConfigMap)
 			newVM := masqueradeVM
 			newVM.Name = "newVM"
 
@@ -217,7 +233,7 @@ var _ = Describe("Pool", func() {
 			Expect(exist).To(BeFalse())
 		})
 		It("should not allocate a new mac for bridge interface on pod network", func() {
-			poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", &vmConfigMap)
+			poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:00:00:00", "02:00:00:00:00:00:00:02", &vmConfigMap)
 			newVM := sampleVM
 			newVM.Name = "newVM"
 
@@ -226,7 +242,7 @@ var _ = Describe("Pool", func() {
 			Expect(len(poolManager.macPoolMap)).To(Equal(0))
 		})
 		It("should allocate a new mac and release it for multiple interfaces", func() {
-			poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", &samplePod, &vmConfigMap)
+			poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:00:00:00", "02:00:00:00:00:00:00:02", &samplePod, &vmConfigMap)
 			newVM := multipleInterfacesVM.DeepCopy()
 			newVM.Name = "newVM"
 
@@ -256,7 +272,7 @@ var _ = Describe("Pool", func() {
 		})
 		Describe("Update vm object", func() {
 			It("should preserve mac addresses on update", func() {
-				poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", &vmConfigMap)
+				poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:00:00:00", "02:00:00:00:00:00:00:02", &vmConfigMap)
 				newVM := multipleInterfacesVM.DeepCopy()
 				newVM.Name = "newVM"
 				err := poolManager.AllocateVirtualMachineMac(newVM)
@@ -271,7 +287,7 @@ var _ = Describe("Pool", func() {
 				Expect(updateVm.Spec.Template.Spec.Domain.Devices.Interfaces[1].MacAddress).To(Equal("02:00:00:00:00:01"))
 			})
 			It("should preserve mac addresses and allocate a requested one on update", func() {
-				poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", &vmConfigMap)
+				poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:00:00:00", "02:00:00:00:00:00:00:02", &vmConfigMap)
 				newVM := multipleInterfacesVM.DeepCopy()
 				newVM.Name = "newVM"
 
@@ -292,7 +308,7 @@ var _ = Describe("Pool", func() {
 				Expect(exist).To(BeFalse())
 			})
 			It("should allow to add a new interface on update", func() {
-				poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", &vmConfigMap)
+				poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:00:00:00", "02:00:00:00:00:00:00:02", &vmConfigMap)
 				newVM := multipleInterfacesVM.DeepCopy()
 				newVM.Name = "newVM"
 
@@ -323,7 +339,7 @@ var _ = Describe("Pool", func() {
 				Expect(exist).To(BeTrue())
 			})
 			It("should allow to remove an interface on update", func() {
-				poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", &vmConfigMap)
+				poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:00:00:00", "02:00:00:00:00:00:00:02", &vmConfigMap)
 				newVM := multipleInterfacesVM.DeepCopy()
 				newVM.Name = "newVM"
 				newVM.Spec.Template.Spec.Domain.Devices.Interfaces = append(newVM.Spec.Template.Spec.Domain.Devices.Interfaces, anotherMultusBridgeInterface)
@@ -347,7 +363,7 @@ var _ = Describe("Pool", func() {
 				Expect(exist).To(BeFalse())
 			})
 			It("should allow to remove and add an interface on update", func() {
-				poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", &vmConfigMap)
+				poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:00:00:00", "02:00:00:00:00:00:00:02", &vmConfigMap)
 				newVM := multipleInterfacesVM.DeepCopy()
 				newVM.Name = "newVM"
 
@@ -375,7 +391,7 @@ var _ = Describe("Pool", func() {
 
 	Describe("Pool Manager Functions For pod", func() {
 		It("should allocate a new mac and release it", func() {
-			poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", &samplePod, &vmConfigMap)
+			poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:00:00:00", "02:00:00:00:00:00:00:02", &samplePod, &vmConfigMap)
 			newPod := samplePod
 			newPod.Name = "newPod"
 			newPod.Annotations = beforeAllocationAnnotation
@@ -404,7 +420,7 @@ var _ = Describe("Pool", func() {
 			Expect(exist).To(BeFalse())
 		})
 		It("should allocate requested mac when empty", func() {
-			poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", &vmConfigMap)
+			poolManager := createPoolManager("02:00:00:00:00:00", "02:00:00:00:00:02", "02:00:00:00:00:00:00:00", "02:00:00:00:00:00:00:02", &vmConfigMap)
 			newPod := samplePod
 			newPod.Name = "newPod"
 

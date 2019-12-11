@@ -88,6 +88,10 @@ func (a *podAnnotator) Handle(ctx context.Context, req types.Request) types.Resp
 	if err != nil {
 		return admission.ErrorResponse(http.StatusInternalServerError, err)
 	}
+	err = a.poolManager.AllocatePodGUID(copyPod)
+	if err != nil {
+		return admission.ErrorResponse(http.StatusInternalServerError, err)
+	}
 
 	// admission.PatchResponse generates a Response containing patches.
 	return admission.PatchResponse(pod, copyPod)
